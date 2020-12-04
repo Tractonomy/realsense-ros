@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+
+<!--
+License: Apache 2.0. See LICENSE file in root directory.
+Copyright(c) 2020 Intel Corporation. All Rights Reserved
+
+This is the URDF model for the inertial modules of the
+Intel RealSense 435i camera.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="gazebo_d435i_imu_modules" params="camera_name reference_link accel_optical_frame gyro_optical_frame">
+    
+    <!-- Load parameters to model's main link-->
+    <gazebo reference="${reference_link}">
+      <gravity>1</gravity>
+      <sensor name="${camera_name}imu" type="imu">
+        <always_on>1</always_on>
+        <!-- Publish at 100 hz -->
+        <update_rate>100</update_rate>
+        <imu>
+          <angular_velocity>
+            <x>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>2e-4</stddev>
+                <bias_mean>0.0000075</bias_mean>
+                <bias_stddev>0.0000008</bias_stddev>
+              </noise>
+            </x>
+            <y>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>2e-4</stddev>
+                <bias_mean>0.0000075</bias_mean>
+                <bias_stddev>0.0000008</bias_stddev>
+              </noise>
+            </y>
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>2e-4</stddev>
+                <bias_mean>0.0000075</bias_mean>
+                <bias_stddev>0.0000008</bias_stddev>
+              </noise>
+            </z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>1.7e-2</stddev>
+                <bias_mean>0.1</bias_mean>
+                <bias_stddev>0.001</bias_stddev>
+              </noise>
+            </x>
+            <y>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>1.7e-2</stddev>
+                <bias_mean>0.1</bias_mean>
+                <bias_stddev>0.001</bias_stddev>
+              </noise>
+            </y>
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>1.7e-2</stddev>
+                <bias_mean>0.1</bias_mean>
+                <bias_stddev>0.001</bias_stddev>
+              </noise>
+            </z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+    </gazebo>
+
+    <gazebo>
+      <plugin name='${camera_name}_gyro_plugin' filename='libgazebo_ros_imu_sensor.so'>
+        <ros>
+          <remapping>~/out:=${camera_name}/camera/gyro/sample</remapping>
+        </ros>
+        <frame_name>${gyro_optical_frame}</frame_name>
+        <initial_orientation_as_reference>false</initial_orientation_as_reference>
+      </plugin>
+      <plugin name='${camera_name}_accel_plugin' filename='libgazebo_ros_imu_sensor.so'>
+        <ros>
+          <remapping>~/out:=${camera_name}/camera/accel/sample</remapping>
+        </ros>
+        <frame_name>${accel_optical_frame}</frame_name>
+        <initial_orientation_as_reference>false</initial_orientation_as_reference>
+      </plugin>
+    </gazebo>
+
+  </xacro:macro>
+</robot>
+
