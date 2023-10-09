@@ -31,7 +31,7 @@ using namespace realsense2_camera;
 constexpr auto realsense_ros_camera_version = REALSENSE_ROS_EMBEDDED_VERSION_STR;
 
 RealSenseNodeFactory::RealSenseNodeFactory(const rclcpp::NodeOptions & node_options) :
-    Node("camera", "/", node_options),
+    Node("camera", "/camera", node_options),
     _logger(this->get_logger())
 {
   init();
@@ -274,7 +274,7 @@ void RealSenseNodeFactory::init()
         _reconnect_timeout = declare_parameter("reconnect_timeout", 6.0);
 
         // A ROS2 hack: until a better way is found to avoid auto convertion of strings containing only digits to integers:
-        if (_serial_no.front() == '_') _serial_no = _serial_no.substr(1);    // remove '_' prefix
+        if (!_serial_no.empty() && _serial_no.front() == '_') _serial_no = _serial_no.substr(1);    // remove '_' prefix
 
         std::string rosbag_filename(declare_parameter("rosbag_filename", rclcpp::ParameterValue("")).get<rclcpp::PARAMETER_STRING>());
         if (!rosbag_filename.empty())
@@ -358,8 +358,6 @@ void RealSenseNodeFactory::startDevice()
     {
         switch(pid)
         {
-        case SR300_PID:
-        case SR300v2_PID:
         case RS400_PID:
         case RS405_PID:
         case RS410_PID:
@@ -377,9 +375,6 @@ void RealSenseNodeFactory::startDevice()
         case RS457_PID:
         case RS465_PID:
         case RS_USB2_PID:
-        case RS_L515_PID_PRE_PRQ:
-        case RS_L515_PID:
-        case RS_L535_PID:
             _realSenseNode = std::unique_ptr<BaseRealSenseNode>(new BaseRealSenseNode(*this, _device, _parameters, this->get_node_options().use_intra_process_comms()));
             break;
         default:

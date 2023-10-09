@@ -116,7 +116,7 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(diagnostic_updater REQUIRED)
 
-find_package(realsense2 2.51.1)
+find_package(realsense2 2.54.1)
 if(NOT realsense2_FOUND)
     message(FATAL_ERROR "\n\n Intel RealSense SDK 2.0 is missing, please install it from https://github.com/IntelRealSense/librealsense/releases\n\n")
 endif()
@@ -138,35 +138,24 @@ set(SOURCES
     src/named_filter.cpp
     src/profile_manager.cpp
     src/image_publisher.cpp
+    src/tfs.cpp
   )
 
 if(NOT DEFINED ENV{ROS_DISTRO})
   message(FATAL_ERROR "ROS_DISTRO is not defined." )
 endif()
-if("$ENV{ROS_DISTRO}" STREQUAL "dashing")
-  message(STATUS "Build for ROS2 Dashing")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDASHING")
-  set(SOURCES "${SOURCES}" src/ros_param_backend_dashing.cpp)
-elseif("$ENV{ROS_DISTRO}" STREQUAL "eloquent")
-  message(STATUS "Build for ROS2 eloquent")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DELOQUENT")
-  set(SOURCES "${SOURCES}" src/ros_param_backend_foxy.cpp)
-elseif("$ENV{ROS_DISTRO}" STREQUAL "foxy")
-  message(STATUS "Build for ROS2 Foxy")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFOXY")
-  set(SOURCES "${SOURCES}" src/ros_param_backend_foxy.cpp)
-elseif("$ENV{ROS_DISTRO}" STREQUAL "galactic")
-  message(STATUS "Build for ROS2 Galactic")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGALACTIC")
-  set(SOURCES "${SOURCES}" src/ros_param_backend_foxy.cpp)
-elseif("$ENV{ROS_DISTRO}" STREQUAL "humble")
+if("$ENV{ROS_DISTRO}" STREQUAL "humble")
   message(STATUS "Build for ROS2 Humble")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHUMBLE")
-  set(SOURCES "${SOURCES}" src/ros_param_backend_foxy.cpp)
+  set(SOURCES "${SOURCES}" src/ros_param_backend.cpp)
+elseif("$ENV{ROS_DISTRO}" STREQUAL "iron")
+  message(STATUS "Build for ROS2 Iron")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIRON")
+  set(SOURCES "${SOURCES}" src/ros_param_backend.cpp)
 elseif("$ENV{ROS_DISTRO}" STREQUAL "rolling")
   message(STATUS "Build for ROS2 Rolling")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DROLLING")
-  set(SOURCES "${SOURCES}" src/ros_param_backend_rolling.cpp)
+  set(SOURCES "${SOURCES}" src/ros_param_backend.cpp)
 else()
   message(FATAL_ERROR "Unsupported ROS Distribution: " "$ENV{ROS_DISTRO}")
 endif()
@@ -267,9 +256,84 @@ install(DIRECTORY
     DESTINATION share/${PROJECT_NAME}
     )
 
+# Install example files
+install(DIRECTORY 
+    examples
+    DESTINATION share/${PROJECT_NAME}
+)
+
 # Test
 if(BUILD_TESTING)
-# This does nothing for now, note that ROS build farm build with BUILD_TESTING=1
+  find_package(ament_cmake_gtest REQUIRED)
+  set(_gtest_folders
+    test
+  )
+  foreach(test_folder ${_gtest_folders})
+    file(GLOB files "${test_folder}/gtest_*.cpp")
+    foreach(file ${files})
+       get_filename_component(_test_name ${file} NAME_WE)
+       ament_add_gtest(${_test_name} ${file})
+       target_include_directories(${_test_name} PUBLIC
+          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+          $<INSTALL_INTERFACE:include>
+       )
+       ament_target_dependencies(${_test_name}
+          std_msgs
+       )
+       #target_link_libraries(${_test_name} name_of_local_library)
+    endforeach()
+  endforeach()
+
+
+  find_package(ament_cmake_pytest REQUIRED)
+  set(_pytest_folders
+    test
+    test/templates
+    test/rosbag
+    test/post_processing_filters
+  )
+  foreach(test_folder ${_pytest_folders})
+    file(GLOB files "${test_folder}/test_*.py")
+    foreach(file ${files})
+
+    get_filename_component(_test_name ${file} NAME_WE)
+    ament_add_pytest_test(${_test_name} ${file}
+      APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}:${CMAKE_SOURCE_DIR}/test/utils:${CMAKE_SOURCE_DIR}/launch:${CMAKE_SOURCE_DIR}/scripts
+      TIMEOUT 60
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+    endforeach()
+  endforeach()
+
+  unset(_pytest_folders)
+
+  set(rs_query_cmd "rs-enumerate-devices -s")
+  execute_process(COMMAND bash -c ${rs_query_cmd}
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      RESULT_VARIABLE rs_result
+      OUTPUT_VARIABLE RS_DEVICE_INFO)
+  message(STATUS "rs_device_info:")
+  message(STATUS "${RS_DEVICE_INFO}")
+  if((RS_DEVICE_INFO MATCHES "D455") OR (RS_DEVICE_INFO MATCHES "D415") OR (RS_DEVICE_INFO MATCHES "D435"))
+    message(STATUS "D455 device found")
+    set(_pytest_live_folders
+      test/live_camera
+    )
+  endif()
+
+  foreach(test_folder ${_pytest_live_folders})
+    file(GLOB files "${test_folder}/test_*.py")
+    foreach(file ${files})
+
+    get_filename_component(_test_name ${file} NAME_WE)
+    ament_add_pytest_test(${_test_name} ${file}
+      APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}:${CMAKE_SOURCE_DIR}/test/utils:${CMAKE_SOURCE_DIR}/launch:${CMAKE_SOURCE_DIR}/scripts
+      TIMEOUT 500
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+    endforeach()
+  endforeach()
+
 endif()
 
 # Ament exports

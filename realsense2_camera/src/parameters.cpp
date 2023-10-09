@@ -23,6 +23,7 @@ void BaseRealSenseNode::getParameters()
     ROS_INFO("getParameters...");
 
     std::string param_name;
+
     param_name = std::string("camera_name");
     _camera_name = _parameters->setParam<std::string>(param_name, "camera");
     _parameters_names.push_back(param_name);
@@ -37,7 +38,6 @@ void BaseRealSenseNode::getParameters()
                 startDynamicTf();
             });
     _parameters_names.push_back(param_name);
-    startDynamicTf();
 
     param_name = std::string("diagnostics_period");
     _diagnostics_period = _parameters->setParam<double>(param_name, DIAGNOSTICS_PERIOD);
@@ -45,6 +45,17 @@ void BaseRealSenseNode::getParameters()
 
     param_name = std::string("enable_sync");
     _parameters->setParamT(param_name, _sync_frames);
+    _parameters_names.push_back(param_name);
+
+    param_name = std::string("enable_rgbd");
+    _parameters->setParamT(param_name, _enable_rgbd, [this](const rclcpp::Parameter& )
+    {
+        {
+            std::lock_guard<std::mutex> lock_guard(_profile_changes_mutex);
+            _is_profile_changed = true;
+        }
+        _cv_mpc.notify_one();
+    });
     _parameters_names.push_back(param_name);
 
     param_name = std::string("json_file_path");
@@ -65,10 +76,6 @@ void BaseRealSenseNode::getParameters()
    
     param_name = std::string("hold_back_imu_for_frames");
     _hold_back_imu_for_frames = _parameters->setParam<bool>(param_name, HOLD_BACK_IMU_FOR_FRAMES);
-    _parameters_names.push_back(param_name);
-
-    param_name = std::string("publish_odom_tf");
-    _publish_odom_tf = _parameters->setParam<bool>(param_name, PUBLISH_ODOM_TF);
     _parameters_names.push_back(param_name);
 
     param_name = std::string("base_frame_id");
@@ -125,6 +132,8 @@ void BaseRealSenseNode::setDynamicParams()
                             [this](const rclcpp::Parameter& parameter)
                             {
                                 _imu_sync_method = imu_sync_method(parameter.get_value<int>());
+                                ROS_WARN("For the 'unite_imu_method' param update to take effect, "
+                                         "re-enable either gyro or accel stream.");
                             }, crnt_descriptor);
     _parameters_names.push_back(param_name);
 }

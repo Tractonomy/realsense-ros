@@ -30,6 +30,7 @@
 #include "realsense2_camera_msgs/msg/imu_info.hpp"
 #include "realsense2_camera_msgs/msg/extrinsics.hpp"
 #include "realsense2_camera_msgs/msg/metadata.hpp"
+#include "realsense2_camera_msgs/msg/rgbd.hpp"
 #include "realsense2_camera_msgs/srv/device_info.hpp"
 #include <librealsense2/hpp/rs_processing.hpp>
 #include <librealsense2/rs_advanced_mode.hpp>
@@ -38,8 +39,6 @@
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
-#include <geometry_msgs/msg/pose_stamped.hpp>
-#include <nav_msgs/msg/odometry.hpp>
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -57,6 +56,7 @@
 
 using realsense2_camera_msgs::msg::Extrinsics;
 using realsense2_camera_msgs::msg::IMUInfo;
+using realsense2_camera_msgs::msg::RGBD;
 
 #define FRAME_ID(sip) (static_cast<std::ostringstream&&>(std::ostringstream() << _camera_name << "_" << STREAM_NAME(sip) << "_frame")).str()
 #define IMU_FRAME_ID (static_cast<std::ostringstream&&>(std::ostringstream() << _camera_name << "_imu_frame")).str()
@@ -68,12 +68,6 @@ namespace realsense2_camera
 {
     typedef std::pair<rs2_stream, int> stream_index_pair;
 
-    const std::vector<stream_index_pair> IMAGE_STREAMS = {DEPTH, INFRA0, INFRA1, INFRA2,
-                                                          COLOR,
-                                                          FISHEYE,
-                                                          FISHEYE1, FISHEYE2};
-
-    const std::vector<stream_index_pair> HID_STREAMS = {GYRO, ACCEL, POSE};
     class image_publisher; // forward declaration
 
     class PipelineSyncer : public rs2::asynchronous_syncer
@@ -155,16 +149,20 @@ namespace realsense2_camera
         std::shared_ptr<Parameters> _parameters;
         std::list<std::string> _parameters_names;
 
+        void restartStaticTransformBroadcaster();
         void publishExtrinsicsTopic(const stream_index_pair& sip, const rs2_extrinsics& ex);
-        void calcAndPublishStaticTransform(const rs2::stream_profile& profile, const rs2::stream_profile& base_profile);
+        void calcAndAppendTransformMsgs(const rs2::stream_profile& profile, const rs2::stream_profile& base_profile);
         void getDeviceInfo(const realsense2_camera_msgs::srv::DeviceInfo::Request::SharedPtr req,
                                  realsense2_camera_msgs::srv::DeviceInfo::Response::SharedPtr res);
         tf2::Quaternion rotationMatrixToQuaternion(const float rotation[9]) const;
-        void publish_static_tf(const rclcpp::Time& t,
+        void append_static_tf_msg(const rclcpp::Time& t,
                                const float3& trans,
                                const tf2::Quaternion& q,
                                const std::string& from,
                                const std::string& to);
+        void erase_static_tf_msg(const std::string& frame_id,
+                                 const std::string& child_frame_id);
+        void eraseTransformMsgs(const stream_index_pair& sip, const rs2::stream_profile& profile);
         void setup();
 
     private:
@@ -200,20 +198,46 @@ namespace realsense2_camera
         void updateExtrinsicsCalibData(const rs2::video_stream_profile& left_video_profile, const rs2::video_stream_profile& right_video_profile);
         void updateStreamCalibData(const rs2::video_stream_profile& video_profile);
         void SetBaseStream();
-        void publishStaticTransforms(std::vector<rs2::stream_profile> profiles);
+        void publishStaticTransforms();
         void startDynamicTf();
         void publishDynamicTransforms();
         void publishPointCloud(rs2::points f, const rclcpp::Time& t, const rs2::frameset& frameset);
         Extrinsics rsExtrinsicsToMsg(const rs2_extrinsics& extrinsics) const;
-
         IMUInfo getImuInfo(const rs2::stream_profile& profile);
-        
-        void publishFrame(rs2::frame f, const rclcpp::Time& t,
-                          const stream_index_pair& stream,
-                          std::map<stream_index_pair, cv::Mat>& images,
-                          const std::map<stream_index_pair, rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr>& info_publishers,
-                          const std::map<stream_index_pair, std::shared_ptr<image_publisher>>& image_publishers,
-                          const bool is_publishMetadata = true);
+        void initializeFormatsMaps();
+
+        bool fillROSImageMsgAndReturnStatus(
+            const cv::Mat& cv_matrix_image,
+            const stream_index_pair& stream,
+            unsigned int width,
+            unsigned int height,
+            const rs2_format& stream_format,
+            const rclcpp::Time& t,
+            sensor_msgs::msg::Image* img_msg_ptr);
+
+        bool fillCVMatImageAndReturnStatus(
+            rs2::frame& frame,
+            std::map<stream_index_pair, cv::Mat>& images,
+            unsigned int width,
+            unsigned int height,
+            const stream_index_pair& stream);
+
+        void publishFrame(
+            rs2::frame f,
+            const rclcpp::Time& t,
+            const stream_index_pair& stream,
+            std::map<stream_index_pair, cv::Mat>& images,
+            const std::map<stream_index_pair, rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr>& info_publishers,
+            const std::map<stream_index_pair, std::shared_ptr<image_publisher>>& image_publishers,
+            const bool is_publishMetadata = true);
+
+        void publishRGBD(
+            const cv::Mat& rgb_cv_matrix,
+            const rs2_format& color_format,
+            const cv::Mat& depth_cv_matrix,
+            const rs2_format& depth_format,
+            const rclcpp::Time& t);
+
         void publishMetadata(rs2::frame f, const rclcpp::Time& header_time, const std::string& frame_id);
 
         sensor_msgs::msg::Imu CreateUnitedMessage(const CimuData accel_data, const CimuData gyro_data);
@@ -223,19 +247,18 @@ namespace realsense2_camera
         void FillImuData_LinearInterpolation(const CimuData imu_data, std::deque<sensor_msgs::msg::Imu>& imu_msgs);
         void imu_callback(rs2::frame frame);
         void imu_callback_sync(rs2::frame frame, imu_sync_method sync_method=imu_sync_method::COPY);
-        void pose_callback(rs2::frame frame);
         void multiple_message_callback(rs2::frame frame, imu_sync_method sync_method);
         void frame_callback(rs2::frame frame);
         
         void startDiagnosticsUpdater();
         void monitoringProfileChanges();
         void publish_temperature();
-        void setupFiltersPublishers();
         void setAvailableSensors();
         void setCallbackFunctions();
         void updateSensors();
         void publishServices();
         void startPublishers(const std::vector<rs2::stream_profile>& profiles, const RosSensor& sensor);
+        void startRGBDPublisherIfNeeded();
         void stopPublishers(const std::vector<rs2::stream_profile>& profiles);
 
         rs2::device _dev;
@@ -251,7 +274,6 @@ namespace realsense2_camera
         bool  _hold_back_imu_for_frames;
 
         std::map<stream_index_pair, rs2_intrinsics> _stream_intrinsics;
-        std::map<rs2_stream, rs2_format>  _format;
         std::map<stream_index_pair, bool> _enable;
         bool _publish_tf;
         double _tf_publish_rate, _diagnostics_period;
@@ -269,15 +291,15 @@ namespace realsense2_camera
         std::map<stream_index_pair, std::shared_ptr<image_publisher>> _image_publishers;
         
         std::map<stream_index_pair, rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr> _imu_publishers;
-        std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::Odometry>> _odom_publisher;
         std::shared_ptr<SyncedImuPublisher> _synced_imu_publisher;
-        std::map<unsigned int, int> _image_format;
-        std::map<stream_index_pair, rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr> _info_publisher;
+        std::map<stream_index_pair, rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr> _info_publishers;
         std::map<stream_index_pair, rclcpp::Publisher<realsense2_camera_msgs::msg::Metadata>::SharedPtr> _metadata_publishers;
-        std::map<stream_index_pair, rclcpp::Publisher<IMUInfo>::SharedPtr> _imu_info_publisher;
+        std::map<stream_index_pair, rclcpp::Publisher<IMUInfo>::SharedPtr> _imu_info_publishers;
         std::map<stream_index_pair, rclcpp::Publisher<Extrinsics>::SharedPtr> _extrinsics_publishers;
-        std::map<stream_index_pair, cv::Mat> _image;
-        std::map<unsigned int, std::string> _encoding;
+        rclcpp::Publisher<realsense2_camera_msgs::msg::RGBD>::SharedPtr _rgbd_publisher;
+        std::map<stream_index_pair, cv::Mat> _images;
+        std::map<rs2_format, std::string> _rs_format_to_ros_format;
+        std::map<rs2_format, int> _rs_format_to_cv_format;
 
         std::map<stream_index_pair, sensor_msgs::msg::CameraInfo> _camera_info;
         std::atomic_bool _is_initialized_time_base;
@@ -285,8 +307,12 @@ namespace realsense2_camera
 
         rclcpp::Time _ros_time_base;
         bool _sync_frames;
+        bool _enable_rgbd;
+        bool _is_color_enabled;
+        bool _is_depth_enabled;
+        bool _is_accel_enabled;
+        bool _is_gyro_enabled;
         bool _pointcloud;
-        bool _publish_odom_tf;
         imu_sync_method _imu_sync_method;
         stream_index_pair _pointcloud_texture;
         PipelineSyncer _syncer;
