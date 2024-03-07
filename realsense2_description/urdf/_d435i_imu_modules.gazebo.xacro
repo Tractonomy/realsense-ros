@@ -10,7 +10,7 @@ Intel RealSense 435i camera.
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:macro name="gazebo_d435i_imu_modules" params="camera_name reference_link accel_optical_frame gyro_optical_frame">
-    
+
     <!-- Load parameters to model's main link-->
     <gazebo reference="${reference_link}">
       <gravity>1</gravity>
@@ -72,24 +72,21 @@ Intel RealSense 435i camera.
             </z>
           </linear_acceleration>
         </imu>
+        <plugin name='${camera_name}_gyro_plugin' filename='libgazebo_ros_imu_sensor.so'>
+          <ros>
+            <remapping>~/out:=${camera_name}/gyro/data_raw</remapping>
+          </ros>
+          <frame_name>${gyro_optical_frame}</frame_name>
+          <initial_orientation_as_reference>false</initial_orientation_as_reference>
+        </plugin>
+        <plugin name='${camera_name}_accel_plugin' filename='libgazebo_ros_imu_sensor.so'>
+          <ros>
+            <remapping>~/out:=${camera_name}/accel/data_raw</remapping>
+          </ros>
+          <frame_name>${accel_optical_frame}</frame_name>
+          <initial_orientation_as_reference>false</initial_orientation_as_reference>
+        </plugin>
       </sensor>
-    </gazebo>
-
-    <gazebo>
-      <plugin name='${camera_name}_gyro_plugin' filename='libgazebo_ros_imu_sensor.so'>
-        <ros>
-          <remapping>~/out:=${camera_name}/camera/gyro/sample</remapping>
-        </ros>
-        <frame_name>${gyro_optical_frame}</frame_name>
-        <initial_orientation_as_reference>false</initial_orientation_as_reference>
-      </plugin>
-      <plugin name='${camera_name}_accel_plugin' filename='libgazebo_ros_imu_sensor.so'>
-        <ros>
-          <remapping>~/out:=${camera_name}/camera/accel/sample</remapping>
-        </ros>
-        <frame_name>${accel_optical_frame}</frame_name>
-        <initial_orientation_as_reference>false</initial_orientation_as_reference>
-      </plugin>
     </gazebo>
 
   </xacro:macro>
