@@ -20,7 +20,8 @@ This is the URDF model for the Intel RealSense 415 camera, in it's
 aluminum peripherial evaluation case.
 -->
 
-<robot name="usb_plug" xmlns:xacro="http://ros.org/wiki/xacro">
+<robot name="usb_plug"
+  xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:macro name="usb_plug" params="parent *origin name:=usb_plug">
     <xacro:property name="M_PI" value="3.1415926535897931" />
 
@@ -33,18 +34,18 @@ aluminum peripherial evaluation case.
     <link name="${name}_link">
       <visual>
         <!-- 0.044850 0.008000 0.018500 -->
-        <origin xyz="0. -0.022425 0." rpy="0 0 ${M_PI/2}"/>
+        <origin xyz="0. -0.022425 0." rpy="0 0 ${M_PI/2}" />
         <geometry>
           <!--box size="0.044850 0.008 0.0185" /-->
-          <mesh filename="file://$(find realsense2_description)/meshes/plug.stl" />
+          <mesh filename="package://realsense2_description/meshes/plug.stl" />
         </geometry>
-        <material name="plastic"/>
+        <material name="plastic" />
       </visual>
       <collision>
-        <origin xyz="0. -0.022425 0." rpy="0 0 ${M_PI/2}"/>
+        <origin xyz="0. -0.022425 0." rpy="0 0 ${M_PI/2}" />
         <geometry>
           <!--box size="0.044850 0.008 0.0185" /-->
-          <mesh filename="file://$(find realsense2_description)/meshes/plug_collision.stl" />
+          <mesh filename="package://realsense2_description/meshes/plug_collision.stl" />
         </geometry>
       </collision>
     </link>
