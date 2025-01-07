@@ -46,8 +46,8 @@ test_params_align_depth_color_d455 = {
     'device_type': 'D455',
     'enable_color':'true',
     'enable_depth':'true',
-    'depth_module.profile':'848x480x30',    
-    'rgb_camera.profile':'640x480x30',    
+    'depth_module.depth_profile':'848x480x30',    
+    'rgb_camera.color_profile':'640x480x30',    
     'align_depth.enable':'true'
     }
 test_params_align_depth_color_d415 = {
@@ -55,8 +55,8 @@ test_params_align_depth_color_d415 = {
     'device_type': 'D415',
     'enable_color':'true',
     'enable_depth':'true',
-    'depth_module.profile':'848x480x30',    
-    'rgb_camera.profile':'640x480x30',    
+    'depth_module.depth_profile':'848x480x30',    
+    'rgb_camera.color_profile':'640x480x30',    
     'align_depth.enable':'true'
     }
 '''
@@ -79,6 +79,7 @@ class TestCamera_AlignDepthColor(pytest_rs_utils.RsTestBaseClass):
         params = launch_descr_with_parameters[1]
         if pytest_live_camera_utils.check_if_camera_connected(params['device_type']) == False:
             print("Device not found? : " + params['device_type'])
+            assert False
             return
         themes = [
         {'topic':get_node_heirarchy(params)+'/color/image_raw',
@@ -107,11 +108,11 @@ class TestCamera_AlignDepthColor(pytest_rs_utils.RsTestBaseClass):
             print("Starting camera test...")
             self.init_test("RsTest"+params['camera_name'])
             self.wait_for_node(params['camera_name'])
-            self.create_param_ifs(get_node_heirarchy(params))
+            self.create_service_client_ifs(get_node_heirarchy(params))
             ret = self.run_test(themes)
             assert ret[0], ret[1]
             assert self.process_data(themes)
-            self.set_string_param('rgb_camera.profile', '1280x720x30')
+            self.set_string_param('rgb_camera.color_profile', '1280x720x30')
             self.set_bool_param('enable_color', True)
             themes[0]['width'] = 1280
             themes[0]['height'] = 720
@@ -131,8 +132,8 @@ test_params_all_profiles_d455 = {
     'device_type': 'D455',
     'enable_color':'true',
     'enable_depth':'true',
-    'depth_module.profile':'848x480x30',    
-    'rgb_camera.profile':'640x480x30',    
+    'depth_module.depth_profile':'848x480x30',    
+    'rgb_camera.color_profile':'640x480x30',    
     'align_depth.enable':'true'
     }
 test_params_all_profiles_d415 = {
@@ -140,17 +141,17 @@ test_params_all_profiles_d415 = {
     'device_type': 'D415',
     'enable_color':'true',
     'enable_depth':'true',
-    'depth_module.profile':'848x480x30',    
-    'rgb_camera.profile':'640x480x30',    
+    'depth_module.depth_profile':'848x480x30',    
+    'rgb_camera.color_profile':'640x480x30',    
     'align_depth.enable':'true'
     }
-test_params_all_profiles_d435 = {
-    'camera_name': 'D435',
-    'device_type': 'D435',
+test_params_all_profiles_d435i = {
+    'camera_name': 'D435I',
+    'device_type': 'D435I',
     'enable_color':'true',
     'enable_depth':'true',
-    'depth_module.profile':'848x480x30',    
-    'rgb_camera.profile':'640x480x30',    
+    'depth_module.depth_profile':'848x480x30',    
+    'rgb_camera.color_profile':'640x480x30',    
     'align_depth.enable':'true'
     }
 
@@ -166,7 +167,7 @@ machines that don't have the D455 connected.
 @pytest.mark.parametrize("launch_descr_with_parameters", [
     pytest.param(test_params_all_profiles_d455, marks=pytest.mark.d455),
     pytest.param(test_params_all_profiles_d415, marks=pytest.mark.d415),
-    pytest.param(test_params_all_profiles_d435, marks=pytest.mark.d435),]
+    pytest.param(test_params_all_profiles_d435i, marks=pytest.mark.d435i),]
     ,indirect=True)
 @pytest.mark.launch(fixture=launch_descr_with_parameters)
 class TestCamera_AllAlignDepthColor(pytest_rs_utils.RsTestBaseClass):
@@ -178,6 +179,7 @@ class TestCamera_AllAlignDepthColor(pytest_rs_utils.RsTestBaseClass):
         params = launch_descr_with_parameters[1]
         if pytest_live_camera_utils.check_if_camera_connected(params['device_type']) == False:
             print("Device not found? : " + params['device_type'])
+            assert False
             return
         themes = [
         {'topic':get_node_heirarchy(params)+'/color/image_raw',
@@ -209,7 +211,7 @@ class TestCamera_AllAlignDepthColor(pytest_rs_utils.RsTestBaseClass):
             if cap == None:
                 debug_print("Device not found? : " + params['device_type'])
                 return
-            self.create_param_ifs(get_node_heirarchy(params))
+            self.create_service_client_ifs(get_node_heirarchy(params))
             color_profiles = set([i[1] for i in cap["color_profile"] if i[2] == "RGB8"])
             depth_profiles = set([i[1] for i in cap["depth_profile"] if i[0] == "Depth"])
             for color_profile in color_profiles:
@@ -234,8 +236,8 @@ class TestCamera_AllAlignDepthColor(pytest_rs_utils.RsTestBaseClass):
                     timeout=100.0/fps
                     #for the changes to take effect
                     self.spin_for_time(wait_time=timeout/20)
-                    self.set_string_param('rgb_camera.profile', color_profile)
-                    self.set_string_param('depth_module.profile', depth_profile)
+                    self.set_string_param('rgb_camera.color_profile', color_profile)
+                    self.set_string_param('depth_module.depth_profile', depth_profile)
                     self.set_bool_param('enable_color', True)
                     self.set_bool_param('enable_color', True)
                     self.set_bool_param('align_depth.enable', True)

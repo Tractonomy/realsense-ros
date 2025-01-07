@@ -1,4 +1,4 @@
-# Copyright 2023 Intel Corporation. All Rights Reserved.
+# Copyright 2024 Intel Corporation. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -107,22 +107,30 @@ find_package(builtin_interfaces REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(realsense2_camera_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(diagnostic_updater REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS core)
 
-find_package(realsense2 2.54.1)
+find_package(realsense2 2.56.3)
+if (BUILD_ACCELERATE_GPU_WITH_GLSL)
+  find_package(realsense2-gl 2.56.3)
+endif()
 if(NOT realsense2_FOUND)
     message(FATAL_ERROR "\n\n Intel RealSense SDK 2.0 is missing, please install it from https://github.com/IntelRealSense/librealsense/releases\n\n")
 endif()
 
 #set(CMAKE_NO_SYSTEM_FROM_IMPORTED true)
 include_directories(include)
+
+include_directories(${OpenCV_INCLUDE_DIRS})  # add OpenCV includes to the included dirs
 
 set(node_plugins "")
 
@@ -139,12 +147,21 @@ set(SOURCES
     src/profile_manager.cpp
     src/image_publisher.cpp
     src/tfs.cpp
+    src/actions.cpp
   )
+
+if (BUILD_ACCELERATE_GPU_WITH_GLSL)
+  list(APPEND SOURCES src/gl_gpu_processing.cpp)
+endif()
 
 if(NOT DEFINED ENV{ROS_DISTRO})
   message(FATAL_ERROR "ROS_DISTRO is not defined." )
 endif()
-if("$ENV{ROS_DISTRO}" STREQUAL "humble")
+if("$ENV{ROS_DISTRO}" STREQUAL "foxy")
+  message(STATUS "Build for ROS2 Foxy")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFOXY")
+  set(SOURCES "${SOURCES}" src/ros_param_backend.cpp)
+elseif("$ENV{ROS_DISTRO}" STREQUAL "humble")
   message(STATUS "Build for ROS2 Humble")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHUMBLE")
   set(SOURCES "${SOURCES}" src/ros_param_backend.cpp)
@@ -155,6 +172,10 @@ elseif("$ENV{ROS_DISTRO}" STREQUAL "iron")
 elseif("$ENV{ROS_DISTRO}" STREQUAL "rolling")
   message(STATUS "Build for ROS2 Rolling")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DROLLING")
+  set(SOURCES "${SOURCES}" src/ros_param_backend.cpp)
+elseif("$ENV{ROS_DISTRO}" STREQUAL "jazzy")
+  message(STATUS "Build for ROS2 Jazzy")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DJAZZY")
   set(SOURCES "${SOURCES}" src/ros_param_backend.cpp)
 else()
   message(FATAL_ERROR "Unsupported ROS Distribution: " "$ENV{ROS_DISTRO}")
@@ -171,6 +192,10 @@ if(${rclcpp_VERSION} VERSION_GREATER_EQUAL "17.0")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRCLCPP_HAS_OnSetParametersCallbackType")
 endif()
 
+if (BUILD_ACCELERATE_GPU_WITH_GLSL)
+  add_definitions(-DACCELERATE_GPU_WITH_GLSL)
+endif()
+
 set(INCLUDES
     include/constants.h
     include/realsense_node_factory.h
@@ -184,6 +209,9 @@ set(INCLUDES
     include/profile_manager.h
     include/image_publisher.h)
 
+if (BUILD_ACCELERATE_GPU_WITH_GLSL)
+  list(APPEND INCLUDES include/gl_window.h)
+endif()
 
 if (BUILD_TOOLS)
 
@@ -200,9 +228,17 @@ add_library(${PROJECT_NAME} SHARED
     ${SOURCES}
 )
 
+if (BUILD_ACCELERATE_GPU_WITH_GLSL)
+  set(link_libraries ${realsense2-gl_LIBRARY})
+else()
+  set(link_libraries ${realsense2_LIBRARY})
+endif()
+
+list(APPEND link_libraries ${OpenCV_LIBS})  # add OpenCV libs to link_libraries
+
 target_link_libraries(${PROJECT_NAME}
-    ${realsense2_LIBRARY}
-    )
+    ${link_libraries}
+)
 
 set(dependencies
   cv_bridge
@@ -210,14 +246,20 @@ set(dependencies
   rclcpp
   rclcpp_components
   realsense2_camera_msgs
+  std_srvs
   std_msgs
   sensor_msgs
   nav_msgs
   tf2
-  realsense2
   tf2_ros
   diagnostic_updater
 )
+
+if (BUILD_ACCELERATE_GPU_WITH_GLSL)
+  list(APPEND dependencies realsense2-gl)
+else()
+  list(APPEND dependencies realsense2)
+endif()
 
 ament_target_dependencies(${PROJECT_NAME}
   ${dependencies}
@@ -278,6 +320,7 @@ if(BUILD_TESTING)
           $<INSTALL_INTERFACE:include>
        )
        ament_target_dependencies(${_test_name}
+          std_srvs
           std_msgs
        )
        #target_link_libraries(${_test_name} name_of_local_library)

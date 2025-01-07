@@ -63,6 +63,7 @@ The test was implemented to check the fps of Depth and Color frames. The RosTopi
 modified to make it work, see py_rs_utils for more details.
 To check the fps, a value 'expected_fps_in_hz' has to be added to the corresponding theme
 '''
+@pytest.mark.skipif (os.getenv('RS_ROS_REGRESSION', "not found") == "not found",reason="Regression is not enabled, define RS_ROS_REGRESSION")
 @pytest.mark.parametrize("launch_descr_with_parameters", [    
     pytest.param(test_params_test_fps_d455, marks=pytest.mark.d455),
     pytest.param(test_params_test_fps_d415, marks=pytest.mark.d415),
@@ -74,6 +75,7 @@ class TestCamera_TestFPS(pytest_rs_utils.RsTestBaseClass):
         params = launch_descr_with_parameters[1]
         if pytest_live_camera_utils.check_if_camera_connected(params['device_type']) == False:
             print("Device not found? : " + params['device_type'])
+            assert False
             return
         try:
             ''' 
@@ -82,9 +84,8 @@ class TestCamera_TestFPS(pytest_rs_utils.RsTestBaseClass):
             print("Starting camera test...")
             self.init_test("RsTest"+params['camera_name'])
             self.wait_for_node(params['camera_name'])
-            self.create_param_ifs(get_node_heirarchy(params))
-            #assert self.set_bool_param('enable_color', False)
-            
+            self.create_service_client_ifs(get_node_heirarchy(params))
+
             themes = [
             {'topic':get_node_heirarchy(params)+'/depth/image_rect_raw',
             'msg_type':msg_Image,
@@ -92,13 +93,17 @@ class TestCamera_TestFPS(pytest_rs_utils.RsTestBaseClass):
             }
             ]
             profiles = test_profiles[params['camera_name']]['depth_test_profiles']
+            self.spin_for_time(wait_time=0.5)
             assert self.set_bool_param('enable_color', False)
+            self.spin_for_time(wait_time=0.5)
+
             for profile in profiles:
                 print("Testing profile: ", profile)
                 themes[0]['expected_fps_in_hz']  = float(profile.split('x')[2])
-                assert self.set_string_param('depth_module.profile', profile)
+                assert self.set_string_param('depth_module.depth_profile', profile)
+                self.spin_for_time(wait_time=0.5)
                 assert self.set_bool_param('enable_depth', True)
-                self.spin_for_time(0.5)
+                self.spin_for_time(wait_time=0.5)
                 ret = self.run_test(themes, timeout=25.0)
                 assert ret[0], ret[1]
                 assert self.process_data(themes)
@@ -110,12 +115,15 @@ class TestCamera_TestFPS(pytest_rs_utils.RsTestBaseClass):
             }
             ]
             assert self.set_bool_param('enable_depth', False)
+            self.spin_for_time(wait_time=0.5)
             profiles = test_profiles[params['camera_name']]['color_test_profiles']
             for profile in profiles:
                 print("Testing profile: ", profile)
                 themes[0]['expected_fps_in_hz']  = float(profile.split('x')[2])
-                assert self.set_string_param('rgb_camera.profile', profile)
+                assert self.set_string_param('rgb_camera.color_profile', profile)
+                self.spin_for_time(wait_time=0.5)
                 assert self.set_bool_param('enable_color', True)
+                self.spin_for_time(wait_time=0.5)
                 ret = self.run_test(themes, timeout=25.0)
                 assert ret[0], ret[1]
                 assert self.process_data(themes)

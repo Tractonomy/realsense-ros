@@ -24,11 +24,11 @@ from pytest_rs_utils import debug_print
 
 def get_profile_config(camera_name):
     config = {
-        "Color":{"profile":"rgb_camera.profile", "format":'rgb_camera.color_format', "param":"enable_color", "topic":camera_name+'/color/image_raw',},
-        "Depth":{"profile":"depth_module.profile", "format":'depth_module.depth_format', "param":"enable_depth", 'topic':camera_name+'/depth/image_rect_raw'},
-        "Infrared":{"profile":"depth_module.profile", "format":'depth_module.infra_format', "param":"enable_infra", 'topic':camera_name+'/infra/image_rect_raw'},
-        "Infrared1":{"profile":"depth_module.profile", "format":'depth_module.infra1_format',"param":"enable_infra1", 'topic':camera_name+'/infra/image_rect_raw'},
-        "Infrared2":{"profile":"depth_module.profile", "format":'depth_module.infra2_format',"param":"enable_infra2", 'topic':camera_name+'/infra/image_rect_raw'},
+        "Color":{"profile":"rgb_camera.color_profile", "format":'rgb_camera.color_format', "param":"enable_color", "topic":camera_name+'/color/image_raw',},
+        "Depth":{"profile":"depth_module.depth_profile", "format":'depth_module.depth_format', "param":"enable_depth", 'topic':camera_name+'/depth/image_rect_raw'},
+        "Infrared":{"profile":"depth_module.infra_profile", "format":'depth_module.infra_format', "param":"enable_infra", 'topic':camera_name+'/infra/image_rect_raw'},
+        "Infrared1":{"profile":"depth_module.infra_profile", "format":'depth_module.infra1_format',"param":"enable_infra1", 'topic':camera_name+'/infra1/image_rect_raw'},
+        "Infrared2":{"profile":"depth_module.infra_profile", "format":'depth_module.infra2_format',"param":"enable_infra2", 'topic':camera_name+'/infra2/image_rect_raw'},
     }
     return config
 
@@ -72,20 +72,29 @@ def get_depth_profiles(long_data, start_index, end_index):
         if len(long_data[line_no]) == 0:
             break
         debug_print("depth profile processing:" + long_data[line_no])
-        depth_profile = long_data[line_no].split()
-        if len(depth_profile) == 5:
-            profile = depth_profile[0]
-            value = depth_profile[1]+"x"+depth_profile[3]
-            format = depth_profile[4]
-        elif len(depth_profile) == 6:
-            profile = depth_profile[0]+depth_profile[1]
-            value = depth_profile[2]+"x"+depth_profile[4]
-            format = depth_profile[5]
+        enumerate_devices_line_splitted = long_data[line_no].split()
+        if len(enumerate_devices_line_splitted) == 7:
+            stream0_idx = 1
+            stream1_idx = 0
+            resolution_idx = 2
+            frequency_idx = 5
+            format_idx = 3
+        elif len(enumerate_devices_line_splitted) == 8:
+            stream0_idx = 1
+            stream1_idx = 2
+            resolution_idx = 3
+            frequency_idx = 6
+            format_idx = 4
         else:
             assert false, "Seems that the depth profile info format printed by rs-enumerate-devices changed"
-        value = value[:-2]
-        debug_print("depth profile added: " + profile, value, format)
-        cap.append([profile, value, format])
+        if stream1_idx != 0:
+            depth_camera_stream = enumerate_devices_line_splitted[stream0_idx]+enumerate_devices_line_splitted[stream1_idx]
+        else:
+            depth_camera_stream = enumerate_devices_line_splitted[stream0_idx]
+        depth_profile_param = enumerate_devices_line_splitted[resolution_idx]+"x"+enumerate_devices_line_splitted[frequency_idx]
+        depth_format_param = enumerate_devices_line_splitted[format_idx]
+        debug_print("depth profile added: " + depth_camera_stream, depth_profile_param, depth_format_param)
+        cap.append([depth_camera_stream, depth_profile_param, depth_format_param])
     debug_print(cap)
     return cap
 
@@ -96,16 +105,19 @@ def get_color_profiles(long_data, start_index, end_index):
         if len(long_data[line_no]) == 0:
             break
         debug_print("color profile processing:" + long_data[line_no])
-        color_profile = long_data[line_no].split()
-        if len(color_profile) == 5:
-            profile = color_profile[0]
-            value = color_profile[1]+"x"+color_profile[3]
-            format = color_profile[4]
+        enumerate_devices_line_splitted = long_data[line_no].split()
+        if len(enumerate_devices_line_splitted) == 7:
+            stream_idx = 1
+            resolution_idx = 2
+            frequency_idx = 5
+            format_idx = 3
         else:
             assert false, "Seems that the color profile info format printed by rs-enumerate-devices changed"
-        value = value[:-2]
-        debug_print("color profile added: " + profile, value, format)
-        cap.append([profile, value, format])
+        color_camera_stream = enumerate_devices_line_splitted[stream_idx]
+        color_profile_param = enumerate_devices_line_splitted[resolution_idx]+"x"+enumerate_devices_line_splitted[frequency_idx]
+        color_format_param = enumerate_devices_line_splitted[format_idx]
+        debug_print("color profile added: " + color_camera_stream, color_profile_param, color_format_param)
+        cap.append([color_camera_stream, color_profile_param, color_format_param])
     debug_print(cap)
     return cap
 
@@ -147,7 +159,7 @@ def parse_device_info(long_data, start_index, end_index, device_type, serial_no)
     return capability
 
 def get_camera_capabilities(device_type, serial_no=None):
-    long_data = os.popen("rs-enumerate-devices").read().splitlines()
+    long_data = os.popen("rs-enumerate-devices -v").read().splitlines()
     debug_print(serial_no)
     index = 0
     while index < len(long_data):
@@ -186,11 +198,9 @@ def check_if_camera_connected(device_type, serial_no=None):
         name_line = long_data[index].split()
         if name_line[0] != "Intel":
             continue
-        if name_line[2] != device_type:
+        if name_line[2].casefold() != device_type.casefold():
             continue
-        if serial_no == None:
-            return True
-        if serial_no == name_line[3]:
+        if serial_no is None or serial_no == name_line[3]:
             return True
 
     return False
