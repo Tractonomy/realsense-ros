@@ -65,7 +65,9 @@ This is the Gazebo URDF model for the Intel RealSense D455 camera
           </noise>
         </camera>
         <always_on>1</always_on>
-        <update_rate>90</update_rate>
+        <!-- Sim perf: was 90; the plugin throttles publication to 30 anyway,
+             so rendering above 30 wastes GPU time. -->
+        <update_rate>30</update_rate>
         <visualize>0</visualize>
       </sensor>
       <sensor name="${camera_name}ired2" type="camera">
@@ -87,15 +89,18 @@ This is the Gazebo URDF model for the Intel RealSense D455 camera
           </noise>
         </camera>
         <always_on>1</always_on>
-        <update_rate>90</update_rate>
+        <!-- Sim perf: was 90; see ired1 above. -->
+        <update_rate>30</update_rate>
         <visualize>0</visualize>
       </sensor>
       <sensor name="${camera_name}depth" type="depth">
         <camera name="${camera_name}">
           <horizontal_fov>${87*deg_to_rad}</horizontal_fov>
+          <!-- Sim perf: depth resolution was 1280x720; dropped to 848x480
+               (native D455 depth resolution) to reduce GPU + pointcloud cost. -->
           <image>
-            <width>1280</width>
-            <height>720</height>
+            <width>848</width>
+            <height>480</height>
           </image>
           <clip>
             <near>0.1</near>
@@ -108,7 +113,8 @@ This is the Gazebo URDF model for the Intel RealSense D455 camera
           </noise>
         </camera>
         <always_on>1</always_on>
-        <update_rate>90</update_rate>
+        <!-- Sim perf: was 90; plugin throttles publication to 30 anyway. -->
+        <update_rate>30</update_rate>
         <visualize>0</visualize>
       </sensor>
       <sensor name="${camera_name}imu" type="imu">
