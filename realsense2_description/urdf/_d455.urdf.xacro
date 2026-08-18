@@ -212,7 +212,7 @@ aluminum peripherial evaluation case.
     <!-- Sim perf: publish_pointcloud was "true"; disabled because no sim consumer
          subscribes to ${name}/depth/color/points and the CPU projection of every
          depth frame is one of the largest contributors to low RTF on small GPUs. -->
-    <xacro:gazebo_d455 camera_name="${name}" reference_link="${name}_link" depth_optical_frame="${name}_depth_optical_frame" color_optical_frame="${name}_color_optical_frame" infrared1_optical_frame="${name}_infra1_optical_frame" infrared2_optical_frame="${name}_infra2_optical_frame" publish_pointcloud="false" accel_optical_frame="${name}_accel_optical_frame" gyro_optical_frame="${name}_gyro_optical_frame" />
+    <xacro:gazebo_d455 camera_name="${name}" reference_link="${name}_link" depth_optical_frame="${name}_depth_optical_frame" color_optical_frame="${name}_color_optical_frame" infrared1_optical_frame="${name}_infra1_optical_frame" infrared2_optical_frame="${name}_infra2_optical_frame" publish_pointcloud="true" accel_optical_frame="${name}_accel_optical_frame" gyro_optical_frame="${name}_gyro_optical_frame" />
 
     <xacro:if value="$(arg add_plug)">
       <xacro:usb_plug parent="${name}_link" name="${name}_usb_plug">
