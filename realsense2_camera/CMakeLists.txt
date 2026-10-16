@@ -117,13 +117,17 @@ find_package(tf2 REQUIRED)
 find_package(diagnostic_updater REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core)
 
-find_package(realsense2 2.55.1)
+# Minimum RealSense SDK (librealsense2) this wrapper is built against. Tractonomy
+# (ATRS-1615): matches LIBREALSENSE_VERSION in robot_ws deb_build/Dockerfile.build.
+# librealsense2 ships an AnyNewerVersion config-version file, so this is a minimum,
+# not an exact pin. REQUIRED makes CMake name the version it found and rejected;
+# before, an unsuitable SDK fell through to a misleading "SDK is missing" error.
+set(REALSENSE2_MIN_VERSION 2.58.4)
+find_package(realsense2 ${REALSENSE2_MIN_VERSION} REQUIRED)
 if (BUILD_ACCELERATE_GPU_WITH_GLSL)
-  find_package(realsense2-gl 2.55.1)
+  find_package(realsense2-gl ${REALSENSE2_MIN_VERSION} REQUIRED)
 endif()
-if(NOT realsense2_FOUND)
-    message(FATAL_ERROR "\n\n Intel RealSense SDK 2.0 is missing, please install it from https://github.com/IntelRealSense/librealsense/releases\n\n")
-endif()
+message(STATUS "Using RealSense SDK (librealsense2) ${realsense2_VERSION} (>= ${REALSENSE2_MIN_VERSION} required)")
 
 #set(CMAKE_NO_SYSTEM_FROM_IMPORTED true)
 include_directories(include)
